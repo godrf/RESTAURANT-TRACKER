@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Our Restaurant Tracker</title>
+<link rel="stylesheet" href="/static/leaflet.css" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: #1a1a2e;
+    color: #eee;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+  }
+  header {
+    background: #16213e;
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 2px solid #0f3460;
+    flex-shrink: 0;
+  }
+  header h1 {
+    font-size: 1.3rem;
+    color: #e94560;
+  }
+  .header-actions { display: flex; gap: 8px; }
+  .btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    font-weight: 600;
+    transition: transform 0.1s;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-visited {
+    background: #e94560;
+    color: white;
+  }
+  .btn-wishlist {
+    background: #0f3460;
+    color: #53d8fb;
+    border: 1px solid #53d8fb;
+  }
+  .main-container {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  #map {
+    flex: 1;
+    min-height: 0;
+  }
+  .sidebar {
+    width: 340px;
+    background: #16213e;
+    overflow-y: auto;
+    border-left: 2px solid #0f3460;
+    flex-shrink: 0;
+  }
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 2px solid #0f3460;
+  }
+  .sidebar-tab {
+    flex: 1;
+    padding: 10px;
+    text-align: center;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 0.85rem;
+    background: transparent;
+    border: none;
+    color: #999;
+    transition: all 0.2s;
+  }
+  .sidebar-tab.active {
+    color: #e94560;
+    border-bottom: 2px solid #e94560;
+  }
+  .sidebar-tab:hover { color: #eee; }
+  .restaurant-list { padding: 8px; }
+  .restaurant-card {
+    background: #1a1a2e;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    border: 1px solid transparent;
+  }
+  .restaurant-card:hover { border-color: #e94560; }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+  }
+  .card-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+  }
+  .card-rating {
+    background: #e94560;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    font-weight: 700;
+  }
+  .card-address {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 4px;
+  }
+  .card-notes {
+    font-size: 0.8rem;
+    color: #aaa;
+    font-style: italic;
+  }
+  .card-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .btn-sm {
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .btn-edit { background: #0f3460; color: #53d8fb; }
+  .btn-delete { background: #3a0a0a; color: #e94560; }
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: #16213e;
+    padding: 24px;
+    border-radius: 12px;
+    width: 400px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h2 {
+    margin-bottom: 16px;
+    color: #e94560;
+    font-size: 1.1rem;
+  }
+  .form-group {
+    margin-bottom: 12px;
+  }
+  .form-group label {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.85rem;
+    color: #aaa;
+  }
+  .form-group input,
+  .form-group textarea,
+  .form-group select {
+    width: 100%;
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid #0f3460;
+    background: #1a1a2e;
+    color: #eee;
+    font-size: 0.9rem;
+  }
+  .form-group textarea { resize: vertical; min-height: 60px; }
+  .search-results {
+    max-height: 150px;
+    overflow-y: auto;
+    margin-top: 4px;
+  }
+  .search-result {
+    padding: 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    border-bottom: 1px solid #0f3460;
+    transition: background 0.15s;
+  }
+  .search-result:hover { background: #0f3460; }
+  .search-result-name { font-weight: 600; }
+  .search-result-addr { color: #888; font-size: 0.75rem; }
+  .modal-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 16px;
+  }
+  .btn-save { background: #e94560; color: white; flex: 1; }
+  .btn-cancel { background: #333; color: #ccc; flex: 1; }
+  .rating-display {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+  }
+  .rating-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #0f3460;
+    background: transparent;
+    color: #888;
+    cursor: pointer;
+    font-size: 0.7rem;
+    font-weight: 700;
+    transition: all 0.15s;
+  }
+  .rating-btn.selected {
+    background: #e94560;
+    border-color: #e94560;
+    color: white;
+  }
+  .rating-btn:hover { border-color: #e94560; }
+  .empty-state {
+    padding: 20px;
+    text-align: center;
+    color: #666;
+    font-size: 0.85rem;
+  }
+  .or-divider {
+    text-align: center;
+    color: #555;
+    font-size: 0.8rem;
+    margin: 8px 0;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Our Restaurant Tracker</h1>
+  <div class="header-actions">
+    <button class="btn btn-visited" id="btn-add-visited">+ Been There</button>
+    <button class="btn btn-wishlist" id="btn-add-wishlist">+ Want to Go</button>
+  </div>
+</header>
+<div class="main-container">
+  <div id="map"></div>
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <button class="sidebar-tab active" data-tab="visited" id="tab-visited">
+        Been There
+      </button>
+      <button class="sidebar-tab" data-tab="wishlist" id="tab-wishlist">
+        Want to Go
+      </button>
+    </div>
+    <div class="restaurant-list" id="restaurant-list"></div>
+  </div>
+</div>
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal">
+    <h2 id="modal-title">Add Restaurant</h2>
+    <div class="form-group">
+      <label>Search for a place</label>
+      <input type="text" id="search-input" placeholder="Type a restaurant name or address...">
+      <div class="search-results" id="search-results"></div>
+    </div>
+    <div class="or-divider">- or click on the map -</div>
+    <div class="form-group">
+      <label>Name *</label>
+      <input type="text" id="form-name" placeholder="Restaurant name">
+    </div>
+    <div class="form-group">
+      <label>Address</label>
+      <input type="text" id="form-address" placeholder="Address" readonly>
+    </div>
+    <div class="form-group" style="display:none">
+      <input type="hidden" id="form-lat">
+      <input type="hidden" id="form-lng">
+    </div>
+    <div class="form-group">
+      <label>Status</label>
+      <select id="form-status">
+        <option value="visited">Been There</option>
+        <option value="wishlist">Want to Go</option>
+      </select>
+    </div>
+    <div class="form-group" id="rating-group">
+      <label>Rating (1-10)</label>
+      <div class="rating-display" id="rating-buttons"></div>
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="form-notes" placeholder="What did you think? What do you want to try?"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" id="btn-cancel">Cancel</button>
+      <button class="btn btn-save" id="btn-save">Save</button>
+    </div>
+  </div>
+</div>
+<script src="/static/leaflet.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
